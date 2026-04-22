@@ -6,6 +6,7 @@ pipeline {
         SWARM_MANAGER = "10.10.20.4"
         SSH_USER = "ilkilab10"
         SSH_KEY = "/var/jenkins_home/.ssh/id_rsa"
+        STACK_NAME = "microservice"
     }
 
     stages {
@@ -63,20 +64,26 @@ pipeline {
             }
         }
 
-        stage('Deploy to Swarm') {
+        stage('Deploy Stack to Swarm') {
             steps {
                 script {
+                    // Copier le fichier stack sur le Swarm Manager
+                    sh """
+                        scp -o StrictHostKeyChecking=no \
+                            -i ${SSH_KEY} \
+                            docker-stack.yml \
+                            ${SSH_USER}@${SWARM_MANAGER}:/tmp/docker-stack.yml
+                    """
+
+                    // Déployer ou mettre à jour le stack
                     sh """
                         ssh -o StrictHostKeyChecking=no \
                             -i ${SSH_KEY} \
                             ${SSH_USER}@${SWARM_MANAGER} '
-                                docker service ls | grep -q frontend \
-                                    && docker service update --image ${REGISTRY}/frontend:latest frontend \
-                                    || docker service create --name frontend --replicas 2 -p 80:80 ${REGISTRY}/frontend:latest
-
-                                docker service ls | grep -q backend \
-                                    && docker service update --image ${REGISTRY}/backend:latest backend \
-                                    || docker service create --name backend --replicas 2 -p 3000:3000 ${REGISTRY}/backend:latest
+                                docker stack deploy \
+                                    --compose-file /tmp/docker-stack.yml \
+                                    --with-registry-auth \
+                                    ${STACK_NAME}
                             '
                     """
                 }
