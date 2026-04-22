@@ -1,13 +1,20 @@
 pipeline {
     agent any
 
+    environment {
+        REGISTRY = "10.10.20.2:5000"
+        SWARM_MANAGER = "10.10.20.4"
+        SSH_USER = "gck8s-219010"
+        SSH_KEY = "/var/jenkins_home/.ssh/id_rsa"
+    }
+
     stages {
         stage('Checkout') {
             steps {
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: '*/main']],
-                    userRemoteConfigs: [[url: 'https://github.com/mouici01-gif/Microservice-CI-CD-Pipeline.git']]
+                    userRemoteConfigs: [[url: 'https://github.com/mlayahnejm/Microservice-CI-CD-Pipeline.git']]
                 ])
             }
         }
@@ -16,7 +23,8 @@ pipeline {
             steps {
                 dir('frontend') {
                     script {
-                        sh 'docker build -t frontend:latest .'
+                        sh "docker build -t ${REGISTRY}/frontend:${BUILD_NUMBER} ."
+                        sh "docker tag ${REGISTRY}/frontend:${BUILD_NUMBER} ${REGISTRY}/frontend:latest"
                     }
                 }
             }
@@ -26,7 +34,8 @@ pipeline {
             steps {
                 dir('backend') {
                     script {
-                        sh 'docker build -t backend:latest .'
+                        sh "docker build -t ${REGISTRY}/backend:${BUILD_NUMBER} ."
+                        sh "docker tag ${REGISTRY}/backend:${BUILD_NUMBER} ${REGISTRY}/backend:latest"
                     }
                 }
             }
@@ -37,20 +46,50 @@ pipeline {
                 dir('backend') {
                     script {
                         echo 'Running backend tests - Python-unittest for backend functionality'
-                        echo 'Test run sucessfully' 
+                        echo 'Test run successfully'
                     }
                 }
             }
         }
 
-        stage('Deploy Microservices') {
+        stage('Push Images to Registry') {
             steps {
                 script {
-                    echo 'Deploying frontend and backend services'
-                    sh 'docker run -d -p 80:80 frontend:latest'
-                    sh 'docker run -d -p 3000:3000 backend:latest'
+                    sh "docker push ${REGISTRY}/frontend:${BUILD_NUMBER}"
+                    sh "docker push ${REGISTRY}/frontend:latest"
+                    sh "docker push ${REGISTRY}/backend:${BUILD_NUMBER}"
+                    sh "docker push ${REGISTRY}/backend:latest"
                 }
             }
+        }
+
+        stage('Deploy to Swarm') {
+            steps {
+                script {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no \
+                            -i ${SSH_KEY} \
+                            ${SSH_USER}@${SWARM_MANAGER} '
+                                docker service ls | grep -q frontend \
+                                    && docker service update --image ${REGISTRY}/frontend:latest frontend \
+                                    || docker service create --name frontend --replicas 2 -p 80:80 ${REGISTRY}/frontend:latest
+
+                                docker service ls | grep -q backend \
+                                    && docker service update --image ${REGISTRY}/backend:latest backend \
+                                    || docker service create --name backend --replicas 2 -p 3000:3000 ${REGISTRY}/backend:latest
+                            '
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Pipeline terminé avec succès - Build #${BUILD_NUMBER} déployé sur le Swarm"
+        }
+        failure {
+            echo "❌ Pipeline échoué - vérifier les logs"
         }
     }
 }
