@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     environment {
-        REGISTRY = "10.10.20.2:5000"
+        REGISTRY = "10.10.20.3:5000"
         SWARM_MANAGER = "10.10.20.4"
-        SSH_USER = "gck8s-219010"
+        SSH_USER = "ilkilab10"
         SSH_KEY = "/var/jenkins_home/.ssh/id_rsa"
     }
 
@@ -14,7 +14,7 @@ pipeline {
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: '*/main']],
-                    userRemoteConfigs: [[url: 'https://github.com/mlayahnejm/Microservice-CI-CD-Pipeline.git']]
+                    userRemoteConfigs: [[url: 'https://github.com/mouici01-gif/Microservice-CI-CD-Pipeline.git']]
                 ])
             }
         }
