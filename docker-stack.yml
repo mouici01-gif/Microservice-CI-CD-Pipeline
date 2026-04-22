@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   frontend:
-    image: 10.10.20.2:5000/frontend:latest
+    image: 10.10.20.3:5000/frontend:latest
     ports:
       - "80:80"
     deploy:
@@ -15,7 +15,7 @@ services:
         condition: on-failure
 
   backend:
-    image: 10.10.20.2:5000/backend:latest
+    image: 10.10.20.3:5000/backend:latest
     ports:
       - "3000:3000"
     deploy:
